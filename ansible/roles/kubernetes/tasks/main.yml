@@ -1,0 +1,34 @@
+---
+# file: roles/kubernetes/tasks/main.yml
+
+- name: Create ssh key for this machine (Necesary to start kubernetes)
+  user: name=root generate_ssh_key=yes
+  register: user_var
+  tags: kubernetes
+
+- name: Add key to authorized keys
+  shell: "cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys"
+
+- name: Download Kubernetes release bundle
+  get_url: url="https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v1.0.7/kubernetes.tar.gz" dest="{{kubernetes.temporal_path}}/kubernetes.tar.gz"
+  tags: kubernetes
+
+- name: Untar the kubernetes bundle
+  unarchive: src="{{kubernetes.temporal_path}}/kubernetes.tar.gz" dest={{kubernetes.path}} copy=no
+  tags: kubernetes
+
+- name: Build binaries of kubernetes to ubuntu cluster.
+  shell: ./build.sh chdir={{kubernetes.path}}/kubernetes/cluster/ubuntu
+  tags: kubernetes
+
+- name: Setup default configuration
+  copy: src=config-default.sh dest={{kubernetes.path}}/kubernetes/cluster/ubuntu mode="0755" force=yes
+  tags: kubernetes
+
+- name: Start cluster. :D
+  shell: KUBERNETES_PROVIDER=ubuntu ./kube-up.sh chdir={{kubernetes.path}}/kubernetes/cluster
+  register: result
+  failed_when:
+      - '"start: Job is already running" not in result.stdout'
+      - '"Cluster validation succeeded" not in result.stdout'
+  tags: kubernetes

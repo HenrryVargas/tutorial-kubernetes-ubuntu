@@ -1,0 +1,7 @@
+---
+
+# file: roles/docker/tasks/main.yml
+
+- name: install docker
+  apt: name="docker.io" state=present update_cache=yes
+  tags: docker
