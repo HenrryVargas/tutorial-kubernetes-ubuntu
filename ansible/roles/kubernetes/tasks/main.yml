@@ -1,34 +1,48 @@
 ---
+
 # file: roles/kubernetes/tasks/main.yml
 
 - name: Create ssh key for this machine (Necesary to start kubernetes)
   user: name=root generate_ssh_key=yes
   register: user_var
-  tags: kubernetes
 
 - name: Add key to authorized keys
   shell: "cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys"
 
 - name: Download Kubernetes release bundle
-  get_url: url="https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v1.0.7/kubernetes.tar.gz" dest="{{kubernetes.temporal_path}}/kubernetes.tar.gz"
-  tags: kubernetes
+  get_url: >
+    url="https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v1.2.0/kubernetes.tar.gz"
+    dest="{{kubernetes.temporal_path}}/kubernetes.tar.gz"
 
 - name: Untar the kubernetes bundle
-  unarchive: src="{{kubernetes.temporal_path}}/kubernetes.tar.gz" dest={{kubernetes.path}} copy=no
-  tags: kubernetes
+  unarchive: >
+    src="{{kubernetes.temporal_path}}/kubernetes.tar.gz"
+    dest={{kubernetes.path}} copy=no
 
-- name: Build binaries of kubernetes to ubuntu cluster.
-  shell: ./build.sh chdir={{kubernetes.path}}/kubernetes/cluster/ubuntu
-  tags: kubernetes
+- name: Unarchive salbase tar to configure the cluster.
+  unarchive: >-
+    src={{kubernetes.path}}/kubernetes/server/kubernetes-salt.tar.gz
+    dest={{kubernetes.path}}/kubernetes/cluster
+    copy=no
+
+- name: move saltbase directory outside the unarchive directory
+  shell: mv {{kubernetes.path}}/kubernetes/cluster/kubernetes/saltbase {{kubernetes.path}}/kubernetes/cluster
+  register: result
+  failed_when: "'Directory not empty' not in result.stderr and 'true' in result.failed"
+
+- name: Delete empty directory
+  file: >-
+    path={{kubernetes.path}}/kubernetes/cluster/kubernetes
+    state=absent
 
 - name: Setup default configuration
-  copy: src=config-default.sh dest={{kubernetes.path}}/kubernetes/cluster/ubuntu mode="0755" force=yes
-  tags: kubernetes
+  copy: >
+    src=config-default.sh
+    dest={{kubernetes.path}}/kubernetes/cluster/ubuntu
+    mode="0755"
+    force=yes
 
-- name: Start cluster. :D
+- name: Start cluster
   shell: KUBERNETES_PROVIDER=ubuntu ./kube-up.sh chdir={{kubernetes.path}}/kubernetes/cluster
   register: result
-  failed_when:
-      - '"start: Job is already running" not in result.stdout'
-      - '"Cluster validation succeeded" not in result.stdout'
-  tags: kubernetes
+  failed_when: "'Text file busy' not in result.stdout and 'true' in result.failed"
