@@ -46,3 +46,7 @@
   shell: KUBERNETES_PROVIDER=ubuntu ./kube-up.sh chdir={{kubernetes.path}}/kubernetes/cluster
   register: result
   failed_when: "'Text file busy' not in result.stdout and 'true' in result.failed"
+
+- name: Add kube-system namespace
+  shell: ./kubectl create -f /opt/kubernetes/cluster/ubuntu/namespace.yaml chdir=/opt/kubernetes/cluster/ubuntu/binaries
+  ignore_errors: yes
